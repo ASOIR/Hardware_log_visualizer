@@ -141,3 +141,10 @@ vite.config.ts.timestamp-*
 # ignore csv file
 .csv
 *.CSV
+
+# ignore build file
+build
+
+# ignore idea file
+.idea
+

@@ -8,17 +8,52 @@
       </div>
     </div>
 
-    <aside class="sidebar">
-      <div class="sidebar-header" @click="handleManualOpenFile">
-        <h2>Hardware Viz</h2>
-        <button class="open-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Open File
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="spinner-container">
+        <div class="glow-orb loading-orb"></div>
+        <div class="spinner"></div>
+        <h3>Loading Data</h3>
+        <p>Parsing dataset...</p>
+      </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div v-if="errorMessage" class="error-modal-overlay">
+      <div class="error-modal-box">
+        <div class="error-modal-header">
+          <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <h3>Error</h3>
+        </div>
+        <p class="error-modal-body">{{ errorMessage }}</p>
+        <button class="error-modal-btn" @click="errorMessage = ''">Close</button>
+      </div>
+    </div>
+
+    <!-- Dock Toolbar -->
+    <nav class="dock">
+      <div class="dock-top">
+        <button v-if="parseResult" class="dock-btn" :class="{ active: activeSidebarTab === 'metrics' }" @click="activeSidebarTab = 'metrics'" title="Metrics">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
         </button>
+        <button v-if="parseResult" class="dock-btn" :class="{ active: activeSidebarTab === 'files' }" @click="activeSidebarTab = 'files'" title="Files">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+      <div class="dock-bottom">
+        <button class="dock-btn primary" @click="handleManualOpenFile" title="Open File">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Hardware Viz</h2>
       </div>
 
       <!-- File Explorer inside Sidebar -->
-      <div class="file-explorer" v-if="parseResult && parseResult.files.length > 0">
+      <div class="file-explorer" v-if="parseResult && activeSidebarTab === 'files' && parseResult.files.length > 0">
         <div class="explorer-header">
           <h3>Directory Logs</h3>
         </div>
@@ -40,7 +75,7 @@
         </div>
       </div>
 
-      <div class="metrics-list" v-if="parseResult && categorizedMetrics.length > 0">
+      <div class="metrics-list" v-if="parseResult && activeSidebarTab === 'metrics' && categorizedMetrics.length > 0">
         <div class="metrics-title-row">
           <h3>Categories</h3>
           <span class="badge">{{ parseResult.headers.length }} total</span>
@@ -82,7 +117,7 @@
       </div>
     </aside>
 
-    <main class="chart-area-container">
+    <main class="chart-area-container" ref="chartAreaContainerRef">
       <div class="chart-area" v-if="parseResult">
         <div v-if="selectedIndices.length === 0" class="no-chart-state">
           <div class="placeholder">
@@ -92,21 +127,23 @@
           </div>
         </div>
         
-        <transition-group name="chart-list" tag="div" class="charts-wrapper" mode="out-in">
-          <Chart
-            v-for="(idx, i) in selectedIndices"
-            :key="idx"
-            :title="parseResult.headers[idx]"
-            :times="parseResult.times"
-            :data="parseResult.data[idx]"
-            :colorLine="colors[i % colors.length]"
+        <div class="mega-chart-container" v-show="selectedIndices.length > 0">
+          <v-chart 
+            ref="megaChartRef"
+            class="mega-chart" 
+            :style="{ height: megaChartHeight + 'px' }" 
+            :option="megaChartOption" 
+            :init-options="{ renderer: 'canvas' }" 
+            @datazoom="onMegaZoom"
+            @restore="onRestore"
+            autoresize 
           />
-        </transition-group>
+        </div>
       </div>
       
-      <!-- Global Time Scrubber -->
+      <!-- Fixed Global Timeline Scrubber -->
       <div class="global-timeline" v-if="parseResult && selectedIndices.length > 0">
-        <v-chart class="timeline-chart" :option="timelineOption" autoresize />
+        <v-chart ref="timelineRef" :key="parseResult.loadedFile" class="timeline-chart" :option="timelineOption" @datazoom="onTimelineZoom" @restore="onRestore" autoresize />
       </div>
     </main>
   </div>
@@ -117,12 +154,12 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart, CustomChart } from 'echarts/charts';
-import { GridComponent, DataZoomComponent } from 'echarts/components';
+import { GridComponent, DataZoomComponent, TooltipComponent, TitleComponent, ToolboxComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
-import Chart from './components/Chart.vue';
 import './style.css';
+// Removed unused echarts default import
 
-use([CanvasRenderer, LineChart, CustomChart, GridComponent, DataZoomComponent]);
+use([CanvasRenderer, LineChart, CustomChart, GridComponent, DataZoomComponent, TooltipComponent, TitleComponent, ToolboxComponent]);
 
 declare global {
   interface Window {
@@ -144,6 +181,50 @@ const selectedIndices = ref<number[]>([]);
 const openCategories = ref<Record<string, boolean>>({});
 const fileSearch = ref("");
 const isDragging = ref(false);
+const activeSidebarTab = ref<'metrics' | 'files'>('metrics');
+const isLoading = ref(false);
+const errorMessage = ref("");
+
+const megaChartRef = ref<any>(null);
+const timelineRef = ref<any>(null);
+
+let isSyncing = false;
+
+const onMegaZoom = (e: any) => {
+  if (isSyncing || !timelineRef.value) return;
+  isSyncing = true;
+  timelineRef.value.dispatchAction({
+    type: 'dataZoom',
+    dataZoomIndex: 0,
+    start: e.start ?? (e.batch && e.batch.length > 0 ? e.batch[0].start : undefined),
+    end: e.end ?? (e.batch && e.batch.length > 0 ? e.batch[0].end : undefined),
+    startValue: e.startValue ?? (e.batch && e.batch.length > 0 ? e.batch[0].startValue : undefined),
+    endValue: e.endValue ?? (e.batch && e.batch.length > 0 ? e.batch[0].endValue : undefined)
+  });
+  window.requestAnimationFrame(() => isSyncing = false);
+};
+
+const onTimelineZoom = (e: any) => {
+  if (isSyncing || !megaChartRef.value) return;
+  isSyncing = true;
+  megaChartRef.value.dispatchAction({
+    type: 'dataZoom',
+    dataZoomIndex: 0,
+    start: e.start ?? (e.batch && e.batch.length > 0 ? e.batch[0].start : undefined),
+    end: e.end ?? (e.batch && e.batch.length > 0 ? e.batch[0].end : undefined),
+    startValue: e.startValue ?? (e.batch && e.batch.length > 0 ? e.batch[0].startValue : undefined),
+    endValue: e.endValue ?? (e.batch && e.batch.length > 0 ? e.batch[0].endValue : undefined)
+  });
+  window.requestAnimationFrame(() => isSyncing = false);
+};
+
+const onRestore = () => {
+  if (isSyncing || !megaChartRef.value || !timelineRef.value) return;
+  isSyncing = true;
+  megaChartRef.value.dispatchAction({ type: 'restore' });
+  timelineRef.value.dispatchAction({ type: 'restore' });
+  window.requestAnimationFrame(() => isSyncing = false);
+};
 
 const colors = [
   '#f59e0b', '#f97316', '#ea580c', '#ef4444', 
@@ -168,19 +249,35 @@ const categorizedMetrics = computed(() => {
   if (!parseResult.value) return [];
   
   const groups: Record<string, number[]> = {
-    'CPU 處理器': [], 'GPU 顯示卡': [], 'Memory 記憶體': [],
-    'Storage 磁碟': [], 'Network 網路': [], 'Power & Fan 電源與散熱': [], 'Others 其他': []
+    '處理器相關 (CPU)': [],
+    '顯示卡相關 (GPU)': [],
+    '系統與主機板記憶體 (System & Memory)': [],
+    '散熱、溫度與功耗 (Power & Thermals)': [],
+    '磁碟相關 (Disk)': [],
+    '網路相關 (Network)': [],
+    '其他 (Others)': []
   };
 
   parseResult.value.headers.forEach((h, idx) => {
-    const lower = h.toLowerCase();
-    if (/cpu|核心|處理器|thread|clock|時脈/i.test(lower) && !/gpu/i.test(lower)) groups['CPU 處理器'].push(idx);
-    else if (/gpu|顯示卡|video|vram|d3d/i.test(lower)) groups['GPU 顯示卡'].push(idx);
-    else if (/記憶體|memory|ram|分頁檔|virtual memory/i.test(lower) && !/gpu/i.test(lower)) groups['Memory 記憶體'].push(idx);
-    else if (/硬碟|讀取|寫入|s\.m\.a\.r\.t|drive|ssd|hdd|磁碟|read|write/i.test(lower)) groups['Storage 磁碟'].push(idx);
-    else if (/網路|network|頻寬|lan|ethernet/i.test(lower)) groups['Network 網路'].push(idx);
-    else if (/主機板|vcore|風扇|系統|fan|system|voltage|power|電壓|功耗|溫度|temp|w/i.test(lower)) groups['Power & Fan 電源與散熱'].push(idx);
-    else groups['Others 其他'].push(idx);
+    if (/溫度|℃|功耗|功率|\[W\]|\[V\]|電壓|\[A\]|電流|風扇|\[RPM\]|PPT|TDC|EDC|Power|Temp|Thermal|Pump|VID|Vcore/i.test(h)) {
+      groups['散熱、溫度與功耗 (Power & Thermals)'].push(idx);
+    } else if (/磁碟|讀取活動|寫入活動|總活動|讀取速率|寫入速率|讀取總計|寫入總計|主機寫入|主機讀取/i.test(h)) {
+      groups['磁碟相關 (Disk)'].push(idx);
+    } else if (/下載|上傳/i.test(h)) {
+      groups['網路相關 (Network)'].push(idx);
+    } else if (/GPU|顯示記憶體|PCIe 連結速度|影格率|Frame Time/i.test(h)) {
+      groups['顯示卡相關 (GPU)'].push(idx);
+    } else if (/Core \d|Core C0|Core C1|Core C6|CPU|L3|VDDCR|SOC|FCLK|Infinity/i.test(h) && !/GPU/i.test(h)) {
+      groups['處理器相關 (CPU)'].push(idx);
+    } else if (/記憶體|核心|Tcas|Trcd|Trp|Tras|Trc|Trfc|Command Rate|UCLK|DRAM|系統|MOS|晶片組|VSB|VTT|VBAT|VREF|SPD|VDD|VPP|VOUT|VIN|PMIC|效能下降|效能限制|PCI Express Error|Error|Replay|DLLP|TLP|LCRC|NAKs|Recovery|錯誤總數|V2|T15|\+12V|\+5V|\+3.3V|3VSB|AVSB/i.test(h)) {
+      groups['系統與主機板記憶體 (System & Memory)'].push(idx);
+    } else {
+      if (/CPU|Core/i.test(h)) groups['處理器相關 (CPU)'].push(idx);
+      else if (/GPU|Video|Graphics/i.test(h)) groups['顯示卡相關 (GPU)'].push(idx);
+      else if (/Disk|Read|Write/i.test(h)) groups['磁碟相關 (Disk)'].push(idx);
+      else if (/Network|LAN|Download|Upload/i.test(h)) groups['網路相關 (Network)'].push(idx);
+      else groups['其他 (Others)'].push(idx);
+    }
   });
 
   return Object.entries(groups).filter(([_, indices]) => indices.length > 0).map(([name, indices]) => ({ name, indices }));
@@ -237,30 +334,53 @@ const loadWorkspace = (result: ParseResult) => {
 const handleParseResult = (res: ParseResult) => {
   parseResult.value = res;
   fileSearch.value = "";
+  localStorage.setItem('hwviz_last_file', res.loadedFile);
   setTimeout(() => loadWorkspace(res), 50);
 };
 
 const handleManualOpenFile = async () => {
   try {
     if (window.go && window.go.main && window.go.main.App) {
+      isLoading.value = true;
       const res = await window.go.main.App.OpenFile();
-      handleParseResult(res);
+      if(res) handleParseResult(res);
     }
-  } catch (error) { alert("Failed to open: " + error); }
+  } catch (error) { errorMessage.value = "Failed to open: " + error; }
+  finally { isLoading.value = false; }
 };
 
 const openSpecificFile = async (path: string) => {
   if (path === parseResult.value?.loadedFile) return;
   try {
     if (window.go && window.go.main && window.go.main.App) {
+      isLoading.value = true;
       const res = await window.go.main.App.ParseCSV(path);
-      handleParseResult(res);
+      if(res) handleParseResult(res);
     }
-  } catch (error) { alert("Failed to load file: " + error); }
+  } catch (error) { errorMessage.value = "Failed to load file: " + error; }
+  finally { isLoading.value = false; }
 };
 
-// --- DRAG AND DROP ---
+const chartAreaContainerRef = ref<HTMLElement | null>(null);
+const chartContainerWidth = ref(1200);
+
+// --- ON MOUNT / INIT ---
 onMounted(() => {
+  const resizeObserver = new ResizeObserver(entries => {
+    if (entries.length > 0) {
+      chartContainerWidth.value = entries[0].contentRect.width;
+    }
+  });
+
+  if (chartAreaContainerRef.value) {
+    resizeObserver.observe(chartAreaContainerRef.value);
+  }
+
+  const lastFile = localStorage.getItem('hwviz_last_file');
+  if (lastFile) {
+    openSpecificFile(lastFile);
+  }
+
   // Wails Native Event for Native Desktop Drops
   if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn("file-dropped", (path: string) => {
@@ -281,18 +401,163 @@ onMounted(() => {
   });
 });
 
+// --- MEGA CHART SETUP ---
+const megaChartHeight = computed(() => {
+  const count = selectedIndices.value.length;
+  if (count === 0) return 0;
+  const colCount = Math.max(1, Math.floor(chartContainerWidth.value / 600));
+  const rowCount = Math.ceil(count / colCount);
+  return rowCount * 220 + 40; // 220px per row + 40px padding
+});
+
+const megaChartOption = computed(() => {
+  if (!parseResult.value || selectedIndices.value.length === 0) return {};
+
+  const indices = selectedIndices.value;
+  const count = indices.length;
+  
+  const titles: any[] = [];
+  const grids: any[] = [];
+  const xAxes: any[] = [];
+  const yAxes: any[] = [];
+  const series: any[] = [];
+
+  const colCount = Math.max(1, Math.floor(chartContainerWidth.value / 600));
+  const rowCount = Math.ceil(count / colCount);
+
+  const chartHeightPx = 220;
+  const topOffset = 35;
+  const gridHeight = 160;
+  
+  indices.forEach((dataIndex, i) => {
+    const col = i % colCount;
+    const row = Math.floor(i / colCount);
+
+    const span = 100 / colCount;
+    const leftPadding = 6;
+    const rightPadding = 4;
+    const left = col * span + leftPadding;
+    const width = span - leftPadding - rightPadding;
+
+    titles.push({
+      text: parseResult.value!.headers[dataIndex],
+      left: `${left}%`,
+      top: row * chartHeightPx + 5,
+      textStyle: { color: colors[i % colors.length], fontSize: 13, fontWeight: 500 }
+    });
+
+    grids.push({
+      left: `${left}%`,
+      width: `${width}%`,
+      top: row * chartHeightPx + topOffset,
+      height: gridHeight,
+      containLabel: false
+    });
+
+    const isBottomMostInCol = row === rowCount - 1 || (row === rowCount - 2 && col >= count % colCount && count % colCount !== 0);
+
+    xAxes.push({
+      type: 'category',
+      data: parseResult.value!.times,
+      gridIndex: i,
+      axisLabel: { show: isBottomMostInCol, color: '#a8a29e' },
+      axisTick: { show: isBottomMostInCol },
+      axisLine: { lineStyle: { color: '#444' } }
+    });
+
+    yAxes.push({
+      type: 'value',
+      gridIndex: i,
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+      axisLabel: { color: '#a8a29e', margin: 12 },
+      axisPointer: { 
+        show: true, 
+        label: { show: true, precision: 2, backgroundColor: colors[i % colors.length] }
+      },
+      scale: true
+    });
+
+    series.push({
+      name: parseResult.value!.headers[dataIndex],
+      type: 'line',
+      data: parseResult.value!.data[dataIndex],
+      xAxisIndex: i,
+      yAxisIndex: i,
+      itemStyle: { color: colors[i % colors.length] },
+      lineStyle: { width: 1.5, opacity: 0.9 },
+      showSymbol: false,
+      sampling: 'lttb',
+      large: true,
+      largeThreshold: 2000,
+      hoverAnimation: false,
+      emphasis: { 
+        focus: 'series',
+        scale: true,
+        label: {
+          show: true,
+          position: 'top',
+          color: '#ffffff',
+          backgroundColor: colors[i % colors.length],
+          padding: [4, 6],
+          borderRadius: 4,
+          formatter: (params: any) => Number(params.value).toFixed(2),
+          fontWeight: 'bold',
+          fontSize: 12
+        }
+      }
+    });
+  });
+
+  const xAxisIndices = Array.from({length: count}, (_, i) => i);
+
+  return {
+    backgroundColor: 'transparent',
+    title: titles,
+    grid: grids,
+    xAxis: xAxes,
+    yAxis: yAxes,
+    series: series,
+    tooltip: { 
+      trigger: 'axis',
+      showContent: false,
+      axisPointer: { 
+        type: 'cross', 
+        snap: true, 
+        animation: false,
+        crossStyle: { color: '#f59e0b', type: 'dashed' },
+        label: { backgroundColor: 'rgba(30, 20, 15, 0.95)', color: '#e5e7eb' }
+      }
+    },
+    axisPointer: {
+      link: [{ xAxisIndex: 'all' }]
+    },
+    toolbox: {
+      feature: {
+        dataZoom: { yAxisIndex: 'none' }
+      }
+    },
+    dataZoom: [
+      {
+        id: 'global-zoom',
+        type: 'inside',
+        xAxisIndex: xAxisIndices,
+        filterMode: 'filter'
+      }
+    ]
+  };
+});
+
 // --- GLOBAL TIMELINE (SCRUBBER) ---
-// Dummy chart option just to render a global dataZoom slider mapped to hw-group
 const timelineOption = computed(() => {
   if (!parseResult.value) return {};
   return {
-    group: 'hw-group',
     backgroundColor: 'rgba(30, 20, 15, 0.95)',
-    grid: { left: '8%', right: '5%', top: 5, bottom: 5, height: 0 },
+    grid: { left: '6%', right: '5%', top: 5, bottom: 5, height: 0 },
     xAxis: { type: 'category', data: parseResult.value.times, show: false },
     yAxis: { type: 'value', show: false },
     dataZoom: [
       {
+        id: 'global-zoom',
         type: 'slider',
         show: true,
         xAxisIndex: [0],
@@ -351,7 +616,7 @@ const timelineOption = computed(() => {
 }
 
 .sidebar {
-  width: 330px;
+  width: 270px;
   background: var(--bg-card);
   backdrop-filter: var(--glass-blur);
   border-right: 1px solid var(--border-color);
@@ -363,14 +628,13 @@ const timelineOption = computed(() => {
 }
 
 .sidebar-header {
-  padding: 32px 24px 24px;
+  padding: 24px 24px 16px;
   /* background: linear-gradient(180deg, rgba(245, 158, 11, 0.05), transparent); */
 }
 
 .sidebar-header h2 {
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 24px;
   background: linear-gradient(135deg, #fcd34d, #f97316, #ef4444);
   -webkit-background-clip: text;
   background-clip: text;
@@ -378,32 +642,113 @@ const timelineOption = computed(() => {
   letter-spacing: -0.02em;
 }
 
-.open-btn {
+/* Dock */
+.dock {
+  width: 68px;
+  background: rgba(15, 10, 8, 0.95);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 0;
+  z-index: 15;
+}
+.dock-top, .dock-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.dock-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.dock-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transform: translateY(-2px);
+}
+.dock-btn.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: var(--accent);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+}
+.dock-btn.primary {
   background: linear-gradient(135deg, var(--accent), #ea580c);
   color: white;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  font-size: 1.05rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
+  border: none;
   box-shadow: 0 4px 15px var(--accent-glow);
 }
-.open-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--accent-glow); }
+.dock-btn.primary:hover {
+  box-shadow: 0 8px 25px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 10, 8, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  text-align: center;
+}
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(245, 158, 11, 0.1);
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 24px;
+  z-index: 2;
+}
+.loading-orb {
+  width: 120px;
+  height: 120px;
+  z-index: 1;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.spinner-container h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 8px;
+  z-index: 2;
+}
+.spinner-container p {
+  color: var(--text-muted);
+  z-index: 2;
+}
 
 /* File Explorer */
 .file-explorer {
+  flex: 1;
   border-bottom: 1px solid var(--border-color);
   background: rgba(0,0,0,0.15);
   display: flex;
   flex-direction: column;
-  max-height: 250px;
 }
 .explorer-header h3 {
   padding: 16px 24px 10px;
@@ -523,9 +868,13 @@ const timelineOption = computed(() => {
   position: relative;
 }
 
-.charts-wrapper { display: flex; flex-direction: column; gap: 24px; padding-bottom: 40px; }
-.chart-list-enter-active, .chart-list-leave-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-.chart-list-enter-from, .chart-list-leave-to { opacity: 0; transform: translateY(20px) scale(0.95); }
+.mega-chart-container {
+  width: 100%;
+  min-height: 100%;
+}
+.mega-chart {
+  width: 100%;
+}
 
 .no-chart-state { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; }
 .placeholder { display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--text-muted); opacity: 0.8; position: relative; }
@@ -547,5 +896,52 @@ const timelineOption = computed(() => {
 .timeline-chart {
   width: 100%;
   height: 100%;
+}
+
+/* Error Modal */
+.error-modal-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 10, 8, 0.7);
+  backdrop-filter: blur(5px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.error-modal-box {
+  background: rgba(30, 20, 20, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 24px;
+  border-radius: 12px;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(239, 68, 68, 0.2);
+}
+.error-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #ef4444;
+  margin-bottom: 16px;
+}
+.error-modal-body {
+  color: #d1d5db;
+  font-size: 0.95rem;
+  margin-bottom: 24px;
+  word-break: break-all;
+}
+.error-modal-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.error-modal-btn:hover {
+  background: #dc2626;
 }
 </style>
