@@ -1,0 +1,49 @@
+
+> frontend@0.0.0 test:unit
+> vitest run
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Startup Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯⎯[39m
+Error: Cannot find native binding. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:507:36
+    at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:9:48
+    at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/parse-BGipdujE.mjs:39:46
+    at ModuleJob.run (node:internal/modules/esm/module_job:268:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:543:26)
+    at async start (file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/vitest/dist/chunks/cac.DRKYQDPl.js:2327:27)
+    at async CAC.run (file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/vitest/dist/chunks/cac.DRKYQDPl.js:2306:2) {
+  [cause]: Error: Cannot find module '@rolldown/binding-win32-x64-msvc'
+  Require stack:
+  - C:\Users\cn921\Documents\GitHub\Hardware_log_visualizer\frontend\node_modules\rolldown\dist\shared\binding-CkWPGrSM.mjs
+      at Function._resolveFilename (node:internal/modules/cjs/loader:1249:15)
+      ... 4 lines matching cause stack trace ...
+      at require (node:internal/modules/helpers:141:16)
+      at requireNative (file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:147:21)
+      at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:475:18
+      at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:9:48
+      at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/parse-BGipdujE.mjs:39:46 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      'C:\\Users\\cn921\\Documents\\GitHub\\Hardware_log_visualizer\\frontend\\node_modules\\rolldown\\dist\\shared\\binding-CkWPGrSM.mjs'
+    ],
+    cause: Error: Cannot find module './rolldown-binding.win32-x64-msvc.node'
+    Require stack:
+    - C:\Users\cn921\Documents\GitHub\Hardware_log_visualizer\frontend\node_modules\rolldown\dist\shared\binding-CkWPGrSM.mjs
+        at Function._resolveFilename (node:internal/modules/cjs/loader:1249:15)
+        at Function._load (node:internal/modules/cjs/loader:1075:27)
+        at TracingChannel.traceSync (node:diagnostics_channel:315:14)
+        at wrapModuleLoad (node:internal/modules/cjs/loader:218:24)
+        at Module.require (node:internal/modules/cjs/loader:1340:12)
+        at require (node:internal/modules/helpers:141:16)
+        at requireNative (file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:142:12)
+        at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:475:18
+        at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/binding-CkWPGrSM.mjs:9:48
+        at file:///C:/Users/cn921/Documents/GitHub/Hardware_log_visualizer/frontend/node_modules/rolldown/dist/shared/parse-BGipdujE.mjs:39:46 {
+      code: 'MODULE_NOT_FOUND',
+      requireStack: [Array]
+    }
+  }
+}
+
+
+

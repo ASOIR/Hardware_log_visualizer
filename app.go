@@ -140,13 +140,13 @@ func (a *App) ParseCSV(targetPath string) (*ParseResult, error) {
 	// 2. Process Values using Goroutines for multi-core scaling
 	numWorkers := runtime.NumCPU()
 	var wg sync.WaitGroup
-	wg.Add(numWorkers)
 
 	rowsPerWorker := numRows / numWorkers
 	if rowsPerWorker == 0 {
 		rowsPerWorker = 1
 		numWorkers = 1
 	}
+	wg.Add(numWorkers)
 
 	for w := 0; w < numWorkers; w++ {
 		startRow := w * rowsPerWorker
